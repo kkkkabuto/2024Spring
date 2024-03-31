@@ -4,6 +4,8 @@ from numpy import ceil
 import sympy
 from Crypto.Util.number import *
 
+# test
+
 
 def bsgs(g, y, p):
     m = int(ceil(math.isqrt(p - 1)))
