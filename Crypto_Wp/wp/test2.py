@@ -1,25 +1,8 @@
-def decrypt_vigenere(ciphertext, key):
-    plaintext = ""
-    key_index = 0
-    for char in ciphertext:
-        if char.isalpha():
-            shift = (
-                ord(key[key_index]) - ord("A")
-                if key[key_index].isupper()
-                else ord(key[key_index]) - ord("a")
-            )
-            if char.islower():
-                plaintext += chr((ord(char) - ord("a") - shift) % 26 + ord("a"))
-            else:
-                plaintext += chr((ord(char) - ord("A") - shift) % 26 + ord("A"))
-            key_index = (key_index + 1) % len(key)
-        else:
-            plaintext += char
-    return plaintext
+from sympy import isprime
 
 
-ciphertext = "CBXGU{ORF_BV_NVR_BLF_CRZL_QQ}"
-key = "FDVNP"  # 这里是维吉尼亚密码的密钥
-
-plaintext = decrypt_vigenere(ciphertext, key)
-print("明文:", plaintext)
+n = 24852206647750545040640868093921252282805229864862413863025873203291042799096787789288461426555716785288286492530194901130042940279109598071958012303179823645151637759103558737126271435636657767272703908384802528366090871653024192321398785017073393201385586868836278447340624427705360349350604325533927890879
+print(n.bit_length())
+p = n // 2**513
+print(p)
+assert isprime(p)
