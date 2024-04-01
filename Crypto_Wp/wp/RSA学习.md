@@ -8,7 +8,7 @@
 
     yafu-x64 factor(n)                               //常规分解n
 
-    yafu-x64 "factor(@)" -batchfile 1.txt   //把n复制到txt文件中再分解,用于n过长的情况,txt文件最后要回车
+    yafu-x64 "factor(@)" -batchfile a.txt   //把n复制到txt文件中再分解,用于n过长的情况,txt文件最后要回车
 
 - 例题，[WUSTCTF2020]babyrsa
 ```
