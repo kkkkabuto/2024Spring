@@ -4074,6 +4074,7 @@ print(long_to_bytes(int(k % NN)))
 ```
 
 # 33.多项式环 Pollard's rho algorithm
+- 特点：p = 2 * g * a + 1
 ## 永安杯2023 rsa
 ```python
 from Crypto.Util.number import *
@@ -4132,6 +4133,24 @@ m = int(pow(c, d, a*g))
 flag = long_to_bytes(m)
 print(flag)
 #flag{p01la4d_rHo_a1gOr1thM_r1gh4}
+```
+
+- 此题还有一种解法，c = m ^ e % (a * g),则c = m ^ e mod a,而a是已知的,判断一下a是否是素数，是的话phi=a-1，不是就分解a，再求phi
+- EXP：
+```python
+from Crypto.Util.number import long_to_bytes
+from gmpy2 import *
+from sympy import isprime
+
+e = 65537
+c = 532997872940452282189043430008002793694788439822465302532208754231005799057972378308576109082463996551992533174546386979606697890310597738637156771564229
+a = 2694858406312563434474553988904403597551484373358339092528913028454100111881368126493990657117571672510331411186745639563619323775673115439
+assert isprime(a)
+d = invert(e, a - 1)
+x = pow(c, d, a)
+print(x)
+print(long_to_bytes(x))
+# b'flag{p01la4d_rHo_a1gOr1thM_r1gh4}'
 ```
 
 ## 2021羊城杯easyrsa
@@ -4221,3 +4240,595 @@ print(long_to_bytes(pow(c, d, n)))
 
 ```
 - 此题还有另一种解法，参考 https://zhuanlan.zhihu.com/p/435012704
+
+
+# 34.错误模攻击 RSA-CRT fault attack
+- 参考 https://lazzzaro.github.io/2020/05/06/crypto-RSA/#RSA-CRT
+- learning_with_fault 巅峰极客2022
+```python
+from Crypto.Util.number import *
+from gmpy2 import *
+from secrets import flag
+import os
+
+class RSA():
+    def __init__(self,p,q,e):
+        self.p=p
+        self.q=q
+        self.e=e
+        self.phi=(p-1)*(q-1)
+        self.d=invert(self.e,self.phi)
+        self.dp=self.d%(p-1)
+        self.dq=self.d%(q-1)
+        self.n=p*q
+        self.N=getPrime(512)*getPrime(512)
+
+    def sign(self,message):
+        m=bytes_to_long(message)
+        sig_p=pow(m,self.dp,self.p)
+        sig_q=pow(m,self.dq,self.q)
+        alpha=q*invert(q,p)
+        beta=p*invert(p,q)
+        return long_to_bytes((alpha*sig_p+beta*sig_q)%self.n)
+
+    def corrupt_sign(self,message):
+        m=bytes_to_long(message)
+        sig_p=pow(m,self.dp,self.p)
+        sig_q=pow(m,self.dq,self.q)
+        alpha=q*invert(q,p)
+        beta=p*invert(p,q)
+        return long_to_bytes((alpha*sig_p+beta*sig_q)%self.N)
+
+    def verify(self,message,sign):
+        return long_to_bytes(pow(bytes_to_long(sign),self.e,self.n))==message
+
+p=getPrime(512)
+q=getPrime(512)
+e=65537
+rsa=RSA(p,q,e)
+
+with open("sign.txt","w") as f1:
+    with open("corrupted_sign.txt","w") as f2:
+        for _ in range(6):
+            message=os.urandom(64)
+            sign=rsa.sign(message)
+            corrupted_sign=rsa.corrupt_sign(message)
+            assert rsa.verify(message,sign)
+            f1.write(str(sign)+'\n')
+            f2.write(str(corrupted_sign)+'\n')
+
+enc=pow(bytes_to_long(flag),rsa.e,rsa.n)
+print(f"n = {rsa.n}")
+print(f"N = {rsa.N}")
+print(f"e = {rsa.e}")
+print(f"enc = {enc}")
+'''
+n = 99670316685463632788041383175090257045961799409733877510733415402955763322569510896091638507050126669571444467488936880059210773298729542608112756526719533574432327269721804307073353651955251188547245641771980139488000798458617636759823027148955008149512692983471670488580994385743789385091027299901520585729
+N = 81332992898551792936282861980393365170738006789835182134055801566584228471896473385776004610279937176800796971820133195300006470892468060034368863410462219133248069442508287516929262751427926825122839525496671527936622212986733708071962237633082743396115729744192159064241674410003857168101669882043743570731
+e = 65537
+enc = 2476965183785968993595493003363618829317072815989584886372189393899395623714779397354978469504773556228655475355703015337932838278988328384587983506790841663233499939173166353582189202860394411808445422387063648198432242875738065748287034529713834303346017134249834382745931627301273142828893469374138264396
+'''
+
+```
+
+
+- EXP:
+```python
+# sage
+from Crypto.Util.number import *
+from tqdm import tqdm
+import gmpy2, sys
+
+
+def orthogonal_lattice(B):
+    LB = B.transpose().left_kernel(basis="LLL").basis_matrix()
+    return LB
+
+
+n = 99670316685463632788041383175090257045961799409733877510733415402955763322569510896091638507050126669571444467488936880059210773298729542608112756526719533574432327269721804307073353651955251188547245641771980139488000798458617636759823027148955008149512692983471670488580994385743789385091027299901520585729
+N = 81332992898551792936282861980393365170738006789835182134055801566584228471896473385776004610279937176800796971820133195300006470892468060034368863410462219133248069442508287516929262751427926825122839525496671527936622212986733708071962237633082743396115729744192159064241674410003857168101669882043743570731
+e = 65537
+enc = 2476965183785968993595493003363618829317072815989584886372189393899395623714779397354978469504773556228655475355703015337932838278988328384587983506790841663233499939173166353582189202860394411808445422387063648198432242875738065748287034529713834303346017134249834382745931627301273142828893469374138264396
+
+cs_ = [
+    b"\x17\x8bb3\x11\x1b\xb9\xb9\xc6M\xb0\xaa\x07-\x1ar\xff\xfb\xb4&H7!\xb8\xa1\xce\x07\x8b\x84M\x0bw=m\x193Oc\x97w\x8f\xffy4\xa1\x99\xfcW\xf9|\xeb\xa4\x00\x1eD*\xe8-'\xa9\xef\x9d\x13*\xf4\xbe\x9d\x9b&w\xcb\xfd\xb3\xb6\xa3n\xb8\xb4\x97vT\xec@\x86\xd1R\xb0\n\xe1uC\xbc\x14\xeb\xceSu&'{\xb9\x12\x90\x82\xc7,\xdbr\xebP\xe1j\x11E\xd5\x17\xe1\xd0D\xe7z\x94vt\xbf\x1a\xc4+"
+    ,
+    b'\x1dJ\xc5\xb2\xbe\x05\xe6\xc8T\n\xbe"\xbeU\xed\xba\xec\x85\x05\x8b\x8ayE\xa3}0\x1dk\xa7\x10\xe2E\x19\xfe\x10\x90\xef\r\xdbV\x8b\x87|(\xd1\xb5\xfd\xb9\x14\x84\x05\x03\x81\xc8\xf6\xe5\x8a\x92\xa0\x01I\x8aG:\xc19\x9e\xf0\x8eZ\\Yx\x80|\xb7\x80\x0e\xcd\xa3\xba6\xf8\x98\xb1pB\x05\x8aT#\xbf\x1e\x1b~\xcb\xf5\t\xa2H9\xc9n\x81e\xa2\x15\x97\x11\xe4\x93\xf2\xe6\x80\x97\x99G\xb5\xfe\x07/\xd2\xbd\xad\xcf\x04\x9e\xd0'
+    ,
+    b'Gs\xda\xb8\x8a\x85\xccK\xf7\xa8y\x16\xa5\xf0\x06\xbe\xeb\x83&}a\x85q\x8d:\x1fSb\xb8\xc5\x84\xba*[\xe7\xbb{\x86\xd3\xb3r\xb6\xaaCN\x93\x1d<(\xe2\x1c;\x8crU\x8fD=W\xa7\x0b\xc7\xeag\x96\x06\xd6\xbb\xe4\x04b\xd8\x02\x12\xd6\xfa2\x1e#\xf0\xde\x8b\x88M\xd2\xf47\\\x98\xe0\x04Fu\x1bsy\xf2\xc4\xad\xd6Y\x81u~B:\xd2\x1f\xb3\xab\x01:\xfa\xdf\x19J8\xd0\x18RN\xfe,CA\x15\xb3\xe0'
+    ,
+    b"0I\xda5\x9f\x05v\x17\xdc\xd4q\xd6\x83,\x9d\r\xccc\x8a\xa1\xd4U\xd3\x18\xc9\xc6g\xcd\nX\x99Ah\xed}\xf3\xb1(\xd5I\xc6\x0f@yw9\x9d\xfdv\x15x\xeaRA\xd6\xb0\x1e\xb5B\xe5\x05cc\x06m\xf4NN'\x02q\x1a\x11\xe4\x87P:\xc8\x11a\x9f\xbd\x9c\x98x\xda\xea\xc4\xa8f\x89s\xcaJ\x7f\xeb\xd8\xc1G#\xf4\xdc\xe2\x01\xf2\xa5\x95\x19`)2!\xf5\xb9\xf0\xf2\xbb\xf8\x0bF&&`\xfd*\xe1\xf2\x9c"
+    ,
+    b':\x99/Hxt\xd1\xd4\xaaB\xd6H\x16\xe1\xc9\xe2\xb3\xc3\xa9b\xd3\x96\x9c\x05x6\xf1\xc3d\xa2\xd1U+.\x1b\xac^\xf6Mh7\xb7\x03\x8e\xdc\xca\x0bn\xac\xed\x92\xb8x\x04)\x0f|\x11\xcc\xfa\xf2\\\xba\xee\xc4X\xa8(\x05\xf2\xb5\x8f&\xf3\xff\x1eB\xe7\x94\xf4\xa6\x00!\xe5v\xd9x\xf0s\x94\xf4D(\xa9g\x118\xa7z\x83\xad\xdb\xe6\xe3\xe7\xf8\xf2\xef\xe5@\xe9\x13\x00OB\xcc\x05\xd1,_=\xd2/Og\x81\xa6+'
+    ,
+    b'\x1c|\xb6\xcc\xdfj\xc5\xa0s\xac w\xa6\xf2\x87D\xe3\xf9Y\xf5=\xf0\x0b\xd9\xea\x89,+e\x1e\xb7m#\x99\xd1\x87\x17Z\xed\x1d\xc8\x97;\xa0K\x05.\xaa<\xc6s\xcf\xa2\xa2\\PO\x12&\xb4\x11\xec\xad\x10\xf8\xf7\xd1\xd3_\x80\x17\xe0\x1eP\x93\xe3\xc2\x1e\x03\xea]^\xc6a\x9c\xcb\x90\xbb\x9f\x8by\xa5dhM\xce\xc7\xbc\xf7\xafe\xcf\xc1\xf1\x18@\x1e\xe2\xdb\xfb\xe4^\xc8\xe7\x19\xccnY\xc6o\x7fL\x9fV\xd4\xc4\x15\xe8'
+]
+s_ = [
+    b'\t\x8b\xde\x98\x84\x1d\x9e\xd4\xa0\xb7f\xe0\x05\xb1\xbd8\xb9G\xe3\x0c\x83\x8a\xe5\xf0G7\x12\x1eT\x85o-B\xe4_\xd2\x04\xd9:\xab\xdf\xa1 \x8f\xedt+\x0f\xce\xb5\x90\xaaK\xf0U~v=\x84\xe7$G\xf5\xfb\xd3ok~V\x1a\xec&\x15\x18Y\x0c\x80u\xafF\xf1\x10\x9f\xf2\xe6\xa6\x9a\xbb\xbd+\xa4l\xa9\x11\xd5\t\x13\x16\xa3\xde\xe1\xdfZ\xa9$r\xb5`\xc9"\x11\xab\xc5\x87\xc4\x1d@\x9e\xa4t\xdb#\xbdj\xcb\x95\xefK'
+    ,
+    b'z/\xd6\xfb\xd8\xfa\xc4\xed\xbd\x99\xd0\xa0\x90\xcb\xca\x83\xd8B\xa7\xf4\xbd\xe0\xc2&\x1aQl(\xd6p\x8f\x89=tT\xf1(\xeb\xab\x84[oR\x1fl=\xda\xf5\x18q\x8f\xa7k\x00\x1b\x1a\x0ei\x1fa.ho\x15\x04\x12\xe4\xc2\xd7\x19\x92\xc3\x9b\xfe\xd5\xb6R\xf8\x95\x9fr\x93\xddD\x1c[\x873\xd5\x06\x1b\xa5\x82/6\x9a\x13\xcf\xa4\xcd\x0e]\t\xad?\xd6\x84\r\x90\xef\x86\xf15)\xe34\xf7\xb77\xef\x0c&\xdb8\xa6\xe0\xa5a'
+    ,
+    b'U\x0b\xf6\x9cm])1\xe2\xad\xf9G\x8f\xa2\xbc}\xd7\x18\x89\xa4\xfdFQ\x80m"\xf9\to^\xd9A\x98\xd2\xca\x1e(b\xa8\xbe\xc2m\xf7\n[O\x00\xbc\x87\x17\xed\x0cG\xf2=H\x0e\xc0\x14+\xcb\xd0\x1feT2\xf2Th\xec\xc2\xcf>6,<\x88X\x8f\xe9g\xa8\x00\xafr\x05\x95\rj\x9c\xc6\n\xbb\x8a\x019\xc1\x1ef#\x02[Rh\xd8\xdc|{6\xeb\xe8U\x91\xa4\xeb}\xf4s;E\xe72$i\xdft\xff\''
+    ,
+    b'[\x94\x95T\xf4\xc4\xca\x8drO\x80\x14\xc9<H\xa2a\xdc\xf4`\xac>\xab\x03\xfa\x80Sx\x99\x14\x83$U\x0b\xfa\x8fv\xfd\xda\x1a\xa0\xebY\xaa\x01\xe2XsG\t\xcf\xae\xa0\xbf\x82iG\tQ \xb1\xfe\xa5k\x12\xd9\x12\xf7\x95\xa3\xa5\x8d`z\x19\x1a\x90-\x9aj\x15\xf6f>\x18\x08\xb8\x1f\x88\x1a\x80Th\xd0\x15\x9bw#\'`K\xa5\xf1\xbf"\xe79\xaf\xc7z%p\xa5\x9f\x14\xef\'1\x11\x05Gg\xe9\xda\xc9\x18~['
+    ,
+    b':\xefRE\xd7\xa1?\xf3\xb5\xf7\xdd\xe2\xb6~\x85014\xc0\x8a\x80\xe1\xb5#\x94\x10\xb2\xa0\xfe\x87\xd1t\xc3$&\xde8\x195\xcd\xf4@3\x15\xcaK\xcc\xcd\r:\x83*\xd7l\xb6\xf2} \tJ\xb5xKfjh.\xfb\xb5\x91\xc6\xf2x\x8e\x83\xdc\xc3\xef\x8b\x8dW\xa6\xa6\xb0w\xd8\xf2G\xa5-\xc3\x87\x17;\xedH`:\xcd\x08ts\x9eqPE\xd7\xfc\xc4\x98\xb5\xe0\xad\xb7A\x7f\xcb\x01\xbd\x98\xd3Ea\xb9\x07\x80\xf8\x19'
+    ,
+    b"8\xca\x7f!;\\\xde\x1b\x80i\x9b!\x1c??u\x13\x955\xd0xG\xff\xd7\xba\xfe+\x95\x0eu^\x15\x1a\x0e*\xfe\x8a\xafM\xc0\xd1Ty\xd7\xf1\xa7@\xd6\xa6\xee\x0c:It\x1a\xeag\xfc\x0c\xaf\x02<\x03T)\xeb\xb0\x15\x1cz\x85\x992\xa9\xbe\x9bm\xc4D\x83\xf7\xb5T\xdd9?\x94\xd4\x13\xb4\xb3\x8d\xa9\x92\x9dt\x86\xdb\x0b$\x19l\xb1\xb9\x05'o\xf3!\t\x01\x93'z\x15P\x88\xd7iN\n\x8bA\xb5\xd2}\xe8\x10"
+]
+
+for i in range(6):
+    s_[i] = bytes_to_long(s_[i])
+    cs_[i] = bytes_to_long(cs_[i])
+
+l = 6
+
+v = []
+for i in range(len(cs_)):
+    v.append(int(crt([s_[i], cs_[i]], [n, N])))
+
+v = vector(ZZ, v)
+Lv = orthogonal_lattice(Matrix(v))
+L1 = orthogonal_lattice(Lv.submatrix(0, 0, l - 2, l))
+x, y = L1
+for a in tqdm(range(333)):
+    for b in tqdm(range(333)):
+        z = a * x + b * y
+        for each in (v - z):
+            tmp = gcd(each, n)
+            if tmp > 1:
+                p = tmp
+                print(p)
+                q = n // p
+                assert p * q == n
+                phi = (p - 1) * (q - 1)
+                d = gmpy2.invert(e, phi)
+                m = int(pow(enc, d, n))
+                print(long_to_bytes(m))
+                sys.exit()
+# flag{34bf3913-5c26-4deb-a281-0f89d8bd8a83}
+```
+
+# 35.dp爆破
+- 巅峰极客2022 crtrsa
+```python
+from secret import flagn,p,q
+#p and q are two primes generated by getPrime
+import random
+def key_gen():
+	while True:
+		dp = random.randint(1,1<<20)
+		dq = random.randint(1,q-1)
+		if gcd(dp, p - 1) == 1 and gcd(dq, q - 1) == 1:
+			d = crt([dp,dq],[p-1,q-1])
+			phi = (p-1)*(q-1)
+			R = Integers(phi)
+			e = R(d)^-1
+			return p*q,e
+n,e = key_gen()
+print e
+print n
+print pow(flagn,int(e),n)
+
+```
+- 可以看出dp<2^20=1048676,对于这样的数，可以采取穷举的方法爆破dp
+![alt text](030ef8b1faa3f674d024678f3541030.jpg)
+- m随意选取，gcd(m,p)=1即可，p是素数，只要m也是素数就行
+- EXP:
+```python
+import gmpy2
+from Crypto.Util.number import *
+
+e = 2953544268002866703872076551930953722572317122777861299293407053391808199220655289235983088986372630141821049118015752017412642148934113723174855236142887
+n = 6006128121276172470274143101473619963750725942458450119252491144009018469845917986523007748831362674341219814935241703026024431390531323127620970750816983
+c = 4082777468662493175049853412968913980472986215497247773911290709560282223053863513029985115855416847643274608394467813391117463817805000754191093158289399
+# dp = d % (p-1)     dq = d % (q-1)
+
+m = 5
+for dp in range(1, (1 << 20) + 1):
+    # if dp % 10000 == 0:
+    #     print(dp)
+    temp = pow(m, e * dp, n) - m
+    p = gmpy2.gcd(n, temp)
+    if p != 1:
+        q = n // p
+        try:
+            d = gmpy2.invert(e, (p - 1) * (q - 1))
+            flag = long_to_bytes(pow(c, d, n))
+            if b'flag' in flag or b'ctf' in flag:
+                print(flag)
+                break
+        except:
+            pass
+
+# dp = 915155
+# b'flag{d67fde91-f6c0-484d-88a4-1778f7fa0c05}'
+```
+
+# 36.p和q有方程关系，e很大，接近n（方程与nextprime）
+- 北京站-crypto1
+```python
+from Crypto.Util.number import *
+from gmpy2 import *
+from random import *
+from flag import flag
+
+m = bytes_to_long(flag)
+
+while True:
+    try:
+        p = getPrime(512)
+        q = next_prime(p+2**420)
+        n = p*q
+        phi = (p-1)*(q-1)
+        d = randint(0,n**0.32)
+        e = inverse(d,phi)
+        c = pow(m,e,n)
+        break
+    except:
+        continue
+
+print("e = %d"%e)
+print("n = %d"%n)
+print("c = %d"%c)
+
+'''
+e = 101684733522589049376051051576215902510166244234370429058800153902445053536138419222096346715560283781778705047246555278271919928248836576236044123786248907522717751222608113597458768397652361813688176017155353220911686089871315647328303370846954697334521948003485878793121446614220897034652783771882675756065
+n = 106490064297459077911162044548396107234298314288687868971249318200714506925762583340058042587392504450330878677254698499363515259785914237880057943786202091010532603853142050802310895234445611880617572636397946757345480447391544962796834842717321639098108976593541239044249391398321435940436125823407760564233
+c = 92367575354201067679929326801477992215675304496512806779109227230237905402825022908214026985431756172011616861246881703226244396008088878308925377019775353026444957454196182919500667632574210469783704454438904889268692709062013797002819384105191802781841741128273810101308641357704215204494382259638905571144
+'''
+```
+- 看到e和n接近，一开始想到维纳估计，试了一下发现不行
+- 构造f=p*(p+2**240)-n,方程，求得的根比p大，往前遍历直到n%p==0
+- EXP:
+```python
+#sage
+import gmpy2
+from Crypto.Util.number import *
+n = 106490064297459077911162044548396107234298314288687868971249318200714506925762583340058042587392504450330878677254698499363515259785914237880057943786202091010532603853142050802310895234445611880617572636397946757345480447391544962796834842717321639098108976593541239044249391398321435940436125823407760564233
+e = 101684733522589049376051051576215902510166244234370429058800153902445053536138419222096346715560283781778705047246555278271919928248836576236044123786248907522717751222608113597458768397652361813688176017155353220911686089871315647328303370846954697334521948003485878793121446614220897034652783771882675756065
+c = 92367575354201067679929326801477992215675304496512806779109227230237905402825022908214026985431756172011616861246881703226244396008088878308925377019775353026444957454196182919500667632574210469783704454438904889268692709062013797002819384105191802781841741128273810101308641357704215204494382259638905571144
+RF = RealField(1000)
+x = polygen(RF)
+f = x * (x + 2**420) - n
+p = int(f.roots()[1][0]) # 获得根的实数部分
+while n % p != 0:
+    p = p - 1
+
+q = n // p
+assert n == p*q
+print(f"p = {p}")
+print(f"q = {q}")
+phi = (p-1)*(q-1)
+d = gmpy2.invert(e,phi)
+print(f"d = {d}")
+m = pow(c,d,n)
+flag = long_to_bytes(int(m))
+print(flag)
+# flag{24ceb9bc-08a5-4ba8-8ef5-231dcb049c0f}
+
+```
+
+# 37.Related Message Attack，相关消息攻击
+- 攻击条件：当 Alice 使用同一公钥对两个具有某种线性关系的消息 M1 与 M2 进行加密，并将加密后的消息 C1，C2 发送给了 Bob 时，我们就可能可以获得对应的消息 M1 与 M2
+- 参考https://ctf-wiki.org/crypto/asymmetric/rsa/rsa_coppersmith_attack/
+- https://www.anquanke.com/post/id/158944
+- 例题：
+```
+n:0x9371c61a2b760109781f229d43c6f05b58de65aa2a674ff92334cb5219132448d72c1293c145eb6f35e58791669f2d8d3b6ce506f4b3543beb947cf119f463a00bd33a33c4d566c4fd3f4c73c697fa5f3bf65976284b9cc96ec817241385d480003cdda9649fa0995b013e66f583c9a9710f7e18396fbf461cb31720f94a0f79L
+e:0x3
+encrypt(m):0x5f4e03f28702208b215f39f1c8598b77074bfa238dfb9ce424af7cc8a61f7ea48ffbbd5a5e1a10f686c3f240e85d011f6c8b968d1d607b2e1d5a78ad6947b7d3ec8f33ad32489befab601fe745164e4ff4aed7630da89af7f902f6a1bf7266c9c95b29f2c69c33b93a709f282d43b10c61b1a1fe76f5fee970780d7512389fd1L
+encrypt(m+1):0x5f4e03f28702208b215f39f1c8598b77074bfa238dfb9ce424af7cc8a61f7ea48ffc5c26b0c12bcff9f697f274f59f0e55a147768332fc1f1bac5bbc8f9bb508104f232bdd20091d26adc52e36feda4a156eae7dce4650f83fabc828fdcfb01d25efb98db8b94811ca855a6aa77caff991e7b986db844ff7a140218449aaa7e8L
+```
+- 给了对m和m+1进行加密的密文
+- 脚本：
+```python
+def getM2(a,b,c1,c2,n):
+    a3 = pow(a,3,n)
+    b3 = pow(b,3,n)
+    first = c1-a3*c2+2*b3
+    first = first % n
+    second = 3*b*(a3*c2-b3)
+    second = second % n
+    third = second*gmpy2.invert(first,n)
+    third = third % n
+    fourth = (third+b)*gmpy2.invert(a,n)
+    return fourth % n
+m = getM2(a,b,c1,c2,n)-padding2
+```
+
+- 解题：
+```python
+from Crypto.Util.number import *
+
+
+def getM2(a, b, c1, c2, n, e):
+    a3 = pow(a, e, n)
+    b3 = pow(b, e, n)
+    first = c1 - a3 * c2 + 2 * b3
+    first = first % n
+    second = e * b * (a3 * c2 - b3)
+    second = second % n
+    third = second * inverse(first, n)
+    third = third % n
+    fourth = (third + b) * inverse(a, n)
+    return fourth % n
+
+
+e = 0x3
+a = 1
+b = -1
+c1 = 0x5f4e03f28702208b215f39f1c8598b77074bfa238dfb9ce424af7cc8a61f7ea48ffbbd5a5e1a10f686c3f240e85d011f6c8b968d1d607b2e1d5a78ad6947b7d3ec8f33ad32489befab601fe745164e4ff4aed7630da89af7f902f6a1bf7266c9c95b29f2c69c33b93a709f282d43b10c61b1a1fe76f5fee970780d7512389fd1
+c2 = 0x5f4e03f28702208b215f39f1c8598b77074bfa238dfb9ce424af7cc8a61f7ea48ffc5c26b0c12bcff9f697f274f59f0e55a147768332fc1f1bac5bbc8f9bb508104f232bdd20091d26adc52e36feda4a156eae7dce4650f83fabc828fdcfb01d25efb98db8b94811ca855a6aa77caff991e7b986db844ff7a140218449aaa7e8
+padding2 = 1
+n = 0x9371c61a2b760109781f229d43c6f05b58de65aa2a674ff92334cb5219132448d72c1293c145eb6f35e58791669f2d8d3b6ce506f4b3543beb947cf119f463a00bd33a33c4d566c4fd3f4c73c697fa5f3bf65976284b9cc96ec817241385d480003cdda9649fa0995b013e66f583c9a9710f7e18396fbf461cb31720f94a0f79
+m = getM2(a, b, c1, c2, n, e) - padding2
+print(long_to_bytes(m))
+# b'the key is :everything_is_easy_in_this_question'
+```
+
+# 38.一道有趣的rsa
+- 长城杯2021 baby_rsa
+```python
+#!/usr/bin/env python3
+
+from Crypto.Util.number import *
+from secret import flag, v1, v2, m1, m2
+
+
+def enc_1(val):
+    p, q = pow(v1, (m1+1))-pow((v1+1), m1), pow(v2, (m2+1))-pow((v2+1), m2)
+    assert isPrime(p) and isPrime(q) and (
+        p*q).bit_length() == 2048 and q < p < q << 3
+    return pow(val, 0x10001, p*q)
+
+
+def enc_2(val):
+    assert val.bit_length() < 512
+    while True:
+        fac = [getPrime(512) for i in range(3)]
+        if isPrime(((fac[0]+fac[1]+fac[2]) << 1) - 1):
+            n = fac[0]*fac[1]*fac[2]*(((fac[0]+fac[1]+fac[2]) << 1) - 1)
+            break
+    c = pow(val, 0x10001, n)
+    return (c, n, ((fac[0]+fac[1]+fac[2]) << 1) - 1)
+
+
+if __name__ == "__main__":
+    assert flag[:5] == b'flag{'
+    plain1 = bytes_to_long(flag[:21])
+    plain2 = bytes_to_long(flag[21:])
+    print(enc_1(plain1))
+    print(enc_2(plain2))
+
+'''
+15808773921165746378224649554032774095198531782455904169552223303513940968292896814159288417499220739875833754573943607047855256739976161598599903932981169979509871591999964856806929597805904134099901826858367778386342376768508031554802249075072366710038889306268806744179086648684738023073458982906066972340414398928411147970593935244077925448732772473619783079328351522269170879807064111318871074291073581343039389561175391039766936376267875184581643335916049461784753341115227515163545709454746272514827000601853735356551495685229995637483506735448900656885365353434308639412035003119516693303377081576975540948311
+(40625981017250262945230548450738951725566520252163410124565622126754739693681271649127104109038164852787767296403697462475459670540845822150397639923013223102912674748402427501588018866490878394678482061561521253365550029075565507988232729032055298992792712574569704846075514624824654127691743944112075703814043622599530496100713378696761879982542679917631570451072107893348792817321652593471794974227183476732980623835483991067080345184978482191342430627490398516912714451984152960348899589532751919272583098764118161056078536781341750142553197082925070730178092561314400518151019955104989790911460357848366016263083, 43001726046955078981344016981790445980199072066019323382068244142888931539602812318023095256474939697257802646150348546779647545152288158607555239302887689137645748628421247685225463346118081238718049701320726295435376733215681415774255258419418661466010403928591242961434178730846537471236142683517399109466429776377360118355173431016107543977241358064093102741819626163467139833352454094472229349598479358367203452452606833796483111892076343745958394932132199442718048720633556310467019222434693785423996656306612262714609076119634814783438111843773649519101169326072793596027594057988365133037041133566146897868269, 39796272592331896400626784951713239526857273168732133046667572399622660330587881579319314094557011554851873068389016629085963086136116425352535902598378739)
+'''
+
+```
+- flag被分成两段分别加密
+- 先看enc1，p和q的生成具有固定形式，而且assert isPrime(p) and isPrime(q) and (p*q).bit_length() == 2048 and q < p < q << 3，约束条件很多，这样的p，q在数轴上分布很疏散，可以爆破，增加一个进度条tqdm方便调试
+- 注意for i in tqdm(range(5000)):for j in range(200):两个循环中数的选取，指数肯定不大于底数，慢慢增加，知道爆破得到flag为止
+```python
+from Crypto.Util.number import *
+from tqdm import tqdm
+
+p = []
+q = []
+for i in tqdm(range(5000)):
+    for j in range(200):
+        m = pow(i, (j + 1)) - pow((i + 1), j)
+        m_2 = m ** 2
+        l = len(bin(m_2))
+        if (l >= 2050 and l <= 2053 and isPrime(m)):
+            p.append(m)
+            print(i, j)
+for i in tqdm(range(5000)):
+    for j in range(200):
+        m = pow(i, (j + 1)) - pow((i + 1), j)
+        m_2 = m ** 2
+        l = len(bin(m_2))
+        if (l >= 2047 and l <= 2050 and isPrime(m)):
+            q.append(m)
+            print(i, j)
+c = 15808773921165746378224649554032774095198531782455904169552223303513940968292896814159288417499220739875833754573943607047855256739976161598599903932981169979509871591999964856806929597805904134099901826858367778386342376768508031554802249075072366710038889306268806744179086648684738023073458982906066972340414398928411147970593935244077925448732772473619783079328351522269170879807064111318871074291073581343039389561175391039766936376267875184581643335916049461784753341115227515163545709454746272514827000601853735356551495685229995637483506735448900656885365353434308639412035003119516693303377081576975540948311
+for i in p:
+    for j in q:
+        if (len(bin(i * j)) == 2050 and j < i and i < j << 3):
+            d = inverse(0x10001, (i - 1) * (j - 1))
+            m = long_to_bytes(pow(c, d, i * j))
+            if (b"flag{" in m):
+                print(m)
+# b'flag{8102c552-3d78-4a'
+```
+
+- 再来看enc2，首先生成了三个素数fac[0]，fac[1]，fac[2]，再判断((fac[0]+fac[1]+fac[2]) << 1) - 1是否是素数，是素数的话，则四个数相乘得到n
+- 分解n，得到四个数![alt text](image-26.png)
+- 发现前三个数很小，这与getPrime(512)不符合，先用这四个数求phi和d，算一次m，发现不对
+- ((fac[0]+fac[1]+fac[2]) << 1) - 1这个数题目也给了，这个数应该是素数，但前面都不符合getPrime(512)，这里可能也有问题，果然这个数不是素数，而且分解得到的前三个数和n分解的三个数相同，也就是说n和((fac[0]+fac[1]+fac[2]) << 1) - 1有公因子，这次使用((fac[0]+fac[1]+fac[2]) << 1) - 1分解得到的数计算phi和d，再计算c，这次需要模((fac[0]+fac[1]+fac[2]) << 1) - 1，不能模n
+![alt text](image-27.png)
+- EXP：
+```python
+import gmpy2
+from Crypto.Util.number import *
+
+
+def main():
+    _n = 39796272592331896400626784951713239526857273168732133046667572399622660330587881579319314094557011554851873068389016629085963086136116425352535902598378739
+    e = 0x10001
+    c = 40625981017250262945230548450738951725566520252163410124565622126754739693681271649127104109038164852787767296403697462475459670540845822150397639923013223102912674748402427501588018866490878394678482061561521253365550029075565507988232729032055298992792712574569704846075514624824654127691743944112075703814043622599530496100713378696761879982542679917631570451072107893348792817321652593471794974227183476732980623835483991067080345184978482191342430627490398516912714451984152960348899589532751919272583098764118161056078536781341750142553197082925070730178092561314400518151019955104989790911460357848366016263083
+    phi_n = (
+        (191 - 1)
+        * (193 - 1)
+        * (627383 - 1)
+        * (
+            1720754738477317127758682285465031939891059835873975157555031327070111123628789833299433549669619325160679719355338187877758311485785197492710491
+            - 1
+        )
+    )
+    assert GCD(e, phi_n) == 1
+    d = gmpy2.invert(e, phi_n)
+    m = pow(c, d, _n)
+    print(long_to_bytes(m))
+
+
+if __name__ == "__main__":
+    main()
+```
+
+# 39.DSA签名算法+已知n和phi分解n
+- 签名算法https://ctf-wiki.org/crypto/signature/dsa/#_2
+- 长城杯2022 known_phi
+```python
+from Crypto.Util.number import getPrime, bytes_to_long, inverse, long_to_bytes
+from Crypto.PublicKey import DSA
+from hashlib import sha256
+import random
+from secret import flag
+
+def gen(a):
+    p = getPrime(a) 
+    q = getPrime(a)
+    r = getPrime(a)
+    x = getPrime(a)
+    n = p*q*r*x
+    phi = (p-1)*(q-1)*(r-1)*(x-1)
+
+    return n, phi, [p, q, r, x]
+
+def sign(m, k, x, p, q, g):
+    hm = bytes_to_long(sha256(m).digest())
+    r = pow(g, k, p) % q
+    s = (hm + x*r) * inverse(k, q) % q
+
+    return r,s
+
+e = 65537
+a = 256
+x = bytes_to_long(flag)
+# print(x)
+
+n, phi, n_factors = gen(a)
+n_factors = sorted(n_factors)
+print(f'n = {n}')
+print(f'phi = {phi}')
+m1 = long_to_bytes(n_factors[0] + n_factors[3])
+m2 = long_to_bytes(n_factors[1] + n_factors[2])
+# print(f'm1 = {m1}')
+# print(f'm2 = {m2}')
+
+key = DSA.generate(int(2048))
+q = key.q
+p = key.p
+g = key.g
+assert q > x
+k = random.randint(1, q-1)
+r1, s1 = sign(m1, k, x, p, q, g)
+r2, s2 = sign(m2, k, x, p, q, g)
+# print(f'k = {k}')
+print(f'q = {q}')
+print(f's1 = {s1}')
+print(f'r1 = {r1}')
+print(f's1 = {s1}')
+print(f'r2 = {r2}')
+print(f's2 = {s2}')
+
+'''
+n = 104228256293611313959676852310116852553951496121352860038971098657350022997841589403091722735802150153734050783858816709247647536393314564077002364012463220999962114186339228164032217361145009468516448617173972835797623658266515762201804936729547278758839604969469770650218191574897316410254695420895895051693
+phi = 104228256293611313959676852310116852553951496121352860038971098657350022997837434645707418205268240995284026522165519145773852565112344453740579163420312890001524537570675468046604347184376661743552799809753709321949095844960227307733389258381950812717245522599433727311919405966404418872873961877021696812800
+q = 24513014442114004234202354110477737650785387286781126308169912007819
+s1 = 764450933738974696530033347966845551587903750431946039815672438603
+r1 = 8881880595434882344509893789458546908449907797285477983407324325035
+s1 = 764450933738974696530033347966845551587903750431946039815672438603
+r2 = 8881880595434882344509893789458546908449907797285477983407324325035
+s2 = 22099482232399385060035569388467035727015978742301259782677969649659
+'''
+```
+
+- 首先已知n和phi，先分解n，使用脚本：
+```python
+from math import gcd
+from random import randrange
+
+from gmpy2 import is_prime
+
+
+def factorize_multi_prime(N, phi):
+    """
+    Recovers the prime factors from a modulus if Euler's totient is known.
+    This method works for a modulus consisting of any number of primes, but is considerably be slower than factorize.
+    More information: Hinek M. J., Low M. K., Teske E., "On Some Attacks on Multi-prime RSA" (Section 3)
+    :param N: the modulus
+    :param phi: Euler's totient, the order of the multiplicative group modulo N
+    :return: a tuple containing the prime factors
+    """
+    prime_factors = set()
+    factors = [N]
+    while len(factors) > 0:
+        # Element to factorize.
+        N = factors[0]
+
+        w = randrange(2, N - 1)
+        i = 1
+        while phi % (2 ** i) == 0:
+            sqrt_1 = pow(w, phi // (2 ** i), N)
+            if sqrt_1 > 1 and sqrt_1 != N - 1:
+                # We can remove the element to factorize now, because we have a factorization.
+                factors = factors[1:]
+
+                p = gcd(N, sqrt_1 + 1)
+                q = N // p
+
+                if is_prime(p):
+                    prime_factors.add(p)
+                elif p > 1:
+                    factors.append(p)
+
+                if is_prime(q):
+                    prime_factors.add(q)
+                elif q > 1:
+                    factors.append(q)
+
+                # Continue in the outer loop
+                break
+
+            i += 1
+
+    return tuple(prime_factors)
+n = 104228256293611313959676852310116852553951496121352860038971098657350022997841589403091722735802150153734050783858816709247647536393314564077002364012463220999962114186339228164032217361145009468516448617173972835797623658266515762201804936729547278758839604969469770650218191574897316410254695420895895051693
+phi = 104228256293611313959676852310116852553951496121352860038971098657350022997837434645707418205268240995284026522165519145773852565112344453740579163420312890001524537570675468046604347184376661743552799809753709321949095844960227307733389258381950812717245522599433727311919405966404418872873961877021696812800
+
+n_factors=factorize_multi_prime(n,phi)
+print(n_factors)
+# (114034877389817517986186253205403596431234414440955842208884285396147740113161, 92128261871628241975522014503893089775204276818952562864868068434189077323911, 87835491118288540715995802690214012778910595141140880257454164067662889225787, 112949642503320513342506215562619543574731838853984060837858943255064878544009)
+```
+
+- 接下来看DSA签名，此题使用同一个k对m1和m2分别签名，所以可以求k，继而求x，得到flag
+- EXP:
+```python
+from Crypto.Util.number import *
+from hashlib import sha256
+
+n_factors = (114034877389817517986186253205403596431234414440955842208884285396147740113161,
+             92128261871628241975522014503893089775204276818952562864868068434189077323911,
+             87835491118288540715995802690214012778910595141140880257454164067662889225787,
+             112949642503320513342506215562619543574731838853984060837858943255064878544009)
+n_factors = sorted(n_factors)
+m1 = long_to_bytes(n_factors[0] + n_factors[3])
+m2 = long_to_bytes(n_factors[1] + n_factors[2])
+h1 = bytes_to_long(sha256(m1).digest())
+h2 = bytes_to_long(sha256(m2).digest())
+q = 24513014442114004234202354110477737650785387286781126308169912007819
+s1 = 764450933738974696530033347966845551587903750431946039815672438603
+r1 = 8881880595434882344509893789458546908449907797285477983407324325035
+r2 = 8881880595434882344509893789458546908449907797285477983407324325035
+s2 = 22099482232399385060035569388467035727015978742301259782677969649659
+k = inverse((s1 - s2), q) * (h1 - h2) % q
+x = inverse(r1, q) * (k * s1 - h1) % q
+print(long_to_bytes(x))
+# b'flag{ea16de7-1981-11ed-b58f}'
+
+
+
+```

@@ -8,6 +8,7 @@ def generate_playfair_matrix(key):
     key += "ABCDEFGHIKLMNOPQRSTUVWXYZ"  # 添加剩余字母
     key = "".join(dict.fromkeys(key))  # 去除重复字母
     matrix = [key[i : i + 5] for i in range(0, 25, 5)]  # 将字符串切分成5个字符一组
+    print(matrix)
     return matrix
 
 
@@ -26,6 +27,8 @@ def encrypt(plaintext, key):
     for i in range(0, len(plaintext), 2):
         a, b = plaintext[i], plaintext[i + 1]
         a_row, a_col = divmod(matrix.index(a), 5)  # 获取字母a在矩阵中的位置
+        print("a_row:", a_row)
+        print("a_col:", a_col)
         b_row, b_col = divmod(matrix.index(b), 5)  # 获取字母b在矩阵中的位置
         if a_row == b_row:
             ciphertext += (
@@ -69,7 +72,7 @@ def decrypt(ciphertext, key):
 
 # 测试加密和解密功能
 key = "PLAYFAIREXAMPLE"
-plaintext = "HELLO WORLD"
+plaintext = "HELLOWORLD"
 ciphertext = encrypt(plaintext, key)
 print("加密后的密文:", ciphertext)
 decrypted_plaintext = decrypt(ciphertext, key)

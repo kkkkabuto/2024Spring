@@ -1,65 +1,28 @@
 import random
 from Crypto.Util.number import *
 
-
-def RRSSAA_prime(bit_length):
-    while True:
-        a = random.getrandbits(bit_length // 2)
-        b = random.getrandbits(bit_length // 2)
-
-        if b % 3 == 0:
-            continue
-
-        p = a**2 + 3 * b**2
-        if p.bit_length() == bit_length and p % 3 == 1 and isPrime(p):
-            return p
+import gmpy2
+from Crypto.Util.number import *
 
 
-def RRSSAA_add(P, Q, mod):
-    m, n = P
-    p, q = Q
-
-    if p is None:
-        return P
-    if m is None:
-        return Q
-
-    if n is None and q is None:
-        x = m * p % mod
-        y = (m + p) % mod
-        return (x, y)
-
-    if n is None and q is not None:
-        m, n, p, q = p, q, m, n
-
-    if q is None:
-        if (n + p) % mod != 0:
-            x = (m * p + 2) * inverse(n + p, mod) % mod
-            y = (m + n * p) * inverse(n + p, mod) % mod
-            return (x, y)
-        elif (m - n**2) % mod != 0:
-            x = (m * p + 2) * inverse(m - n**2, mod) % mod
-            return (x, None)
-        else:
-            return (None, None)
-    else:
-        if (m + p + n * q) % mod != 0:
-            x = (m * p + (n + q) * 2) * inverse(m + p + n * q, mod) % mod
-            y = (n * p + m * q + 2) * inverse(m + p + n * q, mod) % mod
-            return (x, y)
-        elif (n * p + m * q + 2) % mod != 0:
-            x = (m * p + (n + q) * 2) * inverse(n * p + m * q, mod) % mod
-            return (x, None)
-        else:
-            return (None, None)
+def main():
+    _n = 39796272592331896400626784951713239526857273168732133046667572399622660330587881579319314094557011554851873068389016629085963086136116425352535902598378739
+    e = 0x10001
+    c = 40625981017250262945230548450738951725566520252163410124565622126754739693681271649127104109038164852787767296403697462475459670540845822150397639923013223102912674748402427501588018866490878394678482061561521253365550029075565507988232729032055298992792712574569704846075514624824654127691743944112075703814043622599530496100713378696761879982542679917631570451072107893348792817321652593471794974227183476732980623835483991067080345184978482191342430627490398516912714451984152960348899589532751919272583098764118161056078536781341750142553197082925070730178092561314400518151019955104989790911460357848366016263083
+    phi_n = (
+        (191 - 1)
+        * (193 - 1)
+        * (627383 - 1)
+        * (
+            1720754738477317127758682285465031939891059835873975157555031327070111123628789833299433549669619325160679719355338187877758311485785197492710491
+            - 1
+        )
+    )
+    assert GCD(e, phi_n) == 1
+    d = gmpy2.invert(e, phi_n)
+    m = pow(c, d, _n)
+    print(long_to_bytes(m))
 
 
-def RRSSAA_power(P, a, mod):
-    res = (None, None)
-    t = P
-    while a > 0:
-        if a & 1:
-            res = RRSSAA_add(res, t, mod)
-        t = RRSSAA_add(t, t, mod)
-        a >>= 1
-    return res
+if __name__ == "__main__":
+    main()

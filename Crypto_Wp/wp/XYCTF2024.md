@@ -1,4 +1,5 @@
-# 1.Sign1n[签到]
+# Crypto
+## 1.Sign1n[签到]
 - 题目：
 ```python
 from Crypto.Util.number import *
@@ -109,7 +110,7 @@ print(long_to_bytes(int(leak)))
 
 ```
 
-# 2.babyRSAMAX
+## 2.babyRSAMAX
 ```python
 from Crypto.Util.number import *
 from gmpy2 import *
@@ -202,7 +203,7 @@ print(long_to_bytes(m))
 ```
 - 提示rabin，也是，公因子是4嘛，那么如何使用rabin解密呢？
 
-# 3.factor1
+## 3.factor1
 - 题目
 ```python
 import gmpy2
@@ -297,7 +298,7 @@ print(flag)
 # XYCTF{a83211a70e18145a59671c08ddc67ba4}
 ```
 
-# 4.factor3
+## 4.factor3
 - 题目
 ```python
 from Crypto.Util.number import *
@@ -629,4 +630,83 @@ m = d**2 ^ c
 print(long_to_bytes(m))
 # b'XYCTF{I_love_to_read_the_crypto_paper_and_try_to_ak_them}'
 
+```
+
+## 5.happy_to_solve1
+- 题目：
+```python
+from Crypto.Util.number import *
+import sympy
+from secrets import flag
+
+
+def get_happy_prime():
+    p = getPrime(512)
+    q = sympy.nextprime(p ^ ((1 << 512) - 1))
+    return p, q
+
+
+m = bytes_to_long(flag)
+p, q = get_happy_prime()
+n = p * q
+e = 65537
+print(n)
+print(pow(m, e, n))
+# 24852206647750545040640868093921252282805229864862413863025873203291042799096787789288461426555716785288286492530194901130042940279109598071958012303179823645151637759103558737126271435636657767272703908384802528366090871653024192321398785017073393201385586868836278447340624427705360349350604325533927890879
+# 14767985399473111932544176852718061186100743117407141435994374261886396781040934632110608219482140465671269958180849886097491653105939368395716596413352563005027867546585191103214650790884720729601171517615620202183534021987618146862260558624458833387692782722514796407503120297235224234298891794056695442287
+
+```
+- q = sympy.nextprime(p ^ ((1 << 512) - 1))， ((1 << 512) - 1)得到512位全1的数字，与p异或后的下一个素数即是q
+- 忽略素数之间的差值（不会很大），那么p和q则是互相反的，p和q都是512位，那么p + q = 2**512
+- 但实际上的q应该还要大一些，那么p + q = 2**512 - k，k不会大于1500，爆破就得到p + q，k每次增加2
+- phi = n - (p + q) + 1，输出含有"XYCTF"的字节串即可
+- EXP：
+```python
+import gmpy2
+from Crypto.Util.number import *
+from  tqdm import tqdm
+
+n =  24852206647750545040640868093921252282805229864862413863025873203291042799096787789288461426555716785288286492530194901130042940279109598071958012303179823645151637759103558737126271435636657767272703908384802528366090871653024192321398785017073393201385586868836278447340624427705360349350604325533927890879
+c =  14767985399473111932544176852718061186100743117407141435994374261886396781040934632110608219482140465671269958180849886097491653105939368395716596413352563005027867546585191103214650790884720729601171517615620202183534021987618146862260558624458833387692782722514796407503120297235224234298891794056695442287
+e = 65537
+k = 1
+# 因为q是p的取反后取比其值大的最近的一个素数，所以p + q = 2**512 - 1 + t
+for i in tqdm(range(1500)):
+    phi = n - (2**512 - 1 + k) + 1
+    d = gmpy2.invert(e, phi)
+    m = pow(c, d, n)
+    if b"XYCTF{" in long_to_bytes(m):
+        print(long_to_bytes(m))
+    k += 2
+# b'XYCTF{3f22f4efe3bbbc71bbcc999a0a622a1a23303cdc}'
+```
+
+# Misc
+## 1.base
+- 打开附件得到
+```python
+LBMUGVCGPMYDOZBTGIZWIYTFG44GGYQ=YjIxODFlNzkxYzY3ZjlkZmZhNX0
+```
+
+- 分为两段：
+第一段是base32，第二段是base64
+- EXP:
+```python
+import base64
+
+enc1 = "LBMUGVCGPMYDOZBTGIZWIYTFG44GGYQ="
+enc2 = "YjIxODFlNzkxYzY3ZjlkZmZhNX0="
+
+flag1 = base64.b32decode(enc1)
+flag2 = base64.b64decode(enc2)
+print(flag1 + flag2)
+# b'XYCTF{07d323dbe78cbb2181e791c67f9dffa5}'
+```
+- 使用python解题需要补上"="，使用在线网站可以不补"="
+
+## 2.真>签到
+- 下载附件得到flag签到.zip，解压需要密码，以为是纯数字爆破，使用ARCHPR提示不是zip文件，010editor打开发现flag
+![alt text](image-31.png)
+```
+XYCTF{59bd0e77d13c_1406b23219e_f91cf3a_153e8ea4_77508ba}
 ```
