@@ -1,0 +1,9 @@
+hex_string = "D79EE0B2A5E0B58EE0A2BAE0ACB3C9ABE0A485CEA5D9BBE0ACAFD4A2DAA5D5ABC9BAE0ADA6E0A2B8D0ADE0A898D79EDB8AD5ABC98EE0B6A5E0A186DAA3DFA3E0B2B7DCA4D2BEE0A6AFE0B1BD35"
+
+# 去掉空格
+hex_string = hex_string.replace(" ", "")
+
+# 将十六进制字符串转换为ASCII字符
+ascii_string = bytes.fromhex(hex_string).decode("utf-8")
+
+print(ascii_string)

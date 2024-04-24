@@ -1454,7 +1454,7 @@ print(decrypted_bytes)
 
 ```
 - 这里不是RSA模幂运算来解密，密文 c 是一个字节串，直接使用 RSA OAEP 解密算法对其进行解密
-- 使用n,e,phi,p,q创建rsa密钥对象，之后cipher = PKCS1_OAEP.new(rsakey)声明密文，再使用cipher.decrypt(c_bytes)解密，这里c_bytes需要是字符串，如果得到的c是数字，则需要使用cipher.decrypt(long_to_bytes(c))，这样解密得到的密文就是字符串，不需要bytes_to_long()转换。
+- 使用n,e,phi,p,q创建rsa密钥对象，之后cipher = PKCS1_OAEP.new(rsakey)声明密文，再使用cipher.decrypt(c_bytes)解密，这里c_bytes需要是字节串，如果得到的c是数字，则需要使用cipher.decrypt(long_to_bytes(c))，这样解密得到的密文就是字符串，不需要bytes_to_long()转换。
 - 体会RSA模幂运算解密(一般题目会表明c是通过模幂运算得到的长数字)和使用RSA OAEP 解密算法（像这种给public.key + flag.enc）的区别
 
 # 12.n=p*q*r , 威尔逊定理

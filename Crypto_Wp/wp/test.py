@@ -1,28 +1,63 @@
-import random
-from Crypto.Util.number import *
-
-import gmpy2
-from Crypto.Util.number import *
+from bintools import *
 
 
-def main():
-    _n = 39796272592331896400626784951713239526857273168732133046667572399622660330587881579319314094557011554851873068389016629085963086136116425352535902598378739
-    e = 0x10001
-    c = 40625981017250262945230548450738951725566520252163410124565622126754739693681271649127104109038164852787767296403697462475459670540845822150397639923013223102912674748402427501588018866490878394678482061561521253365550029075565507988232729032055298992792712574569704846075514624824654127691743944112075703814043622599530496100713378696761879982542679917631570451072107893348792817321652593471794974227183476732980623835483991067080345184978482191342430627490398516912714451984152960348899589532751919272583098764118161056078536781341750142553197082925070730178092561314400518151019955104989790911460357848366016263083
-    phi_n = (
-        (191 - 1)
-        * (193 - 1)
-        * (627383 - 1)
-        * (
-            1720754738477317127758682285465031939891059835873975157555031327070111123628789833299433549669619325160679719355338187877758311485785197492710491
-            - 1
-        )
-    )
-    assert GCD(e, phi_n) == 1
-    d = gmpy2.invert(e, phi_n)
-    m = pow(c, d, _n)
-    print(long_to_bytes(m))
+class LFSR:
+    def __init__(self, keyt, feedpath):
+        self.trigger = []
+        self.feedback = []
+        self.degree = len(keyt)
+        self.feed = len(feedpath)
+        if len(feedpath) != self.degree:
+            return None
+        for i in keyt:
+            self.trigger.append(i)
+        for i in feedpath:
+            self.feedback.append(i)
+
+    def binxor(self, bin1, bin2):
+        if bin1 == bin2:
+            return "0"
+        else:
+            return "1"
+
+    def getfeed(self):
+        self.realdback = []
+        for i in range(self.feed):
+            if self.feedback == "1":
+                self.realdback.append(self.trigger)
+        for i in range(1, len(self.realdback)):
+            self.realdback[0] = self.binxor(self.realdback[0], self.realdback)
+        return self.realdback[0]
+
+    def tick(self):
+        outpin = self.trigger[-1]
+        feedpin = self.getfeed()
+        for i in range(self.degree - 1, 0, -1):
+            self.trigger = self.trigger[i - 1]
+        self.trigger[0] = feedpin
+        return outpin
 
 
-if __name__ == "__main__":
-    main()
+def getenbin(thisobj):
+    tenbin = ""
+    for i in range(8):
+        tenbin += thisobj.tick()
+    print("\t%s" % tenbin, end="")
+    return ord(BinToStr(tenbin))
+
+
+if "__main__" == __name__:
+    newobj = LFSR("10110111101100111111101010011", "00001000000000000111111100010")
+    fr = open("C:\\Users\\19753\\Desktop\\lfsr.png.encrypt", "rb+")
+    string = fr.read()
+    fr.close()
+    newstring = ""
+
+    for i in range(len(string)):
+        newstring += chr(string ^ getenbin(newobj))
+
+    fw = open("C:\\Users\\19753\\Desktop\\lfsr.png.encrypt", "wb+")
+    fw.write(newstring.encode(encoding="latin1"))
+    fw.close()
+    print("\nOk......")
+
