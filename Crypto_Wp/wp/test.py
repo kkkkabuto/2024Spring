@@ -1,63 +1,15 @@
-from bintools import *
+import gmpy2
+from Crypto.Util.number import *
 
+p = 386123125371923651191219869811293586459
+q = 189239861511125143212536989589123569301
 
-class LFSR:
-    def __init__(self, keyt, feedpath):
-        self.trigger = []
-        self.feedback = []
-        self.degree = len(keyt)
-        self.feed = len(feedpath)
-        if len(feedpath) != self.degree:
-            return None
-        for i in keyt:
-            self.trigger.append(i)
-        for i in feedpath:
-            self.feedback.append(i)
+e = 65537
+c = 28767758880940662779934612526152562406674613203406706867456395986985664083182
 
-    def binxor(self, bin1, bin2):
-        if bin1 == bin2:
-            return "0"
-        else:
-            return "1"
-
-    def getfeed(self):
-        self.realdback = []
-        for i in range(self.feed):
-            if self.feedback == "1":
-                self.realdback.append(self.trigger)
-        for i in range(1, len(self.realdback)):
-            self.realdback[0] = self.binxor(self.realdback[0], self.realdback)
-        return self.realdback[0]
-
-    def tick(self):
-        outpin = self.trigger[-1]
-        feedpin = self.getfeed()
-        for i in range(self.degree - 1, 0, -1):
-            self.trigger = self.trigger[i - 1]
-        self.trigger[0] = feedpin
-        return outpin
-
-
-def getenbin(thisobj):
-    tenbin = ""
-    for i in range(8):
-        tenbin += thisobj.tick()
-    print("\t%s" % tenbin, end="")
-    return ord(BinToStr(tenbin))
-
-
-if "__main__" == __name__:
-    newobj = LFSR("10110111101100111111101010011", "00001000000000000111111100010")
-    fr = open("C:\\Users\\19753\\Desktop\\lfsr.png.encrypt", "rb+")
-    string = fr.read()
-    fr.close()
-    newstring = ""
-
-    for i in range(len(string)):
-        newstring += chr(string ^ getenbin(newobj))
-
-    fw = open("C:\\Users\\19753\\Desktop\\lfsr.png.encrypt", "wb+")
-    fw.write(newstring.encode(encoding="latin1"))
-    fw.close()
-    print("\nOk......")
-
+n = p * q
+d = gmpy2.invert(e, (p - 1) * (q - 1))
+print(d)
+m = pow(c, d, n)
+print(m)
+print(long_to_bytes(m))
